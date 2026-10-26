@@ -1,0 +1,6 @@
+{
+  "name": "Marble Sort",
+  "description": "Hyper-casual physics marble sorting mobile game with block grid pop, funnel physics, conveyor belt and brick color matching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
