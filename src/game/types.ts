@@ -21,8 +21,9 @@ export interface GridCell {
   counter?: number; // for dispenser (e.g. 3)
   queue?: MarbleColor[]; // dispenser's upcoming blocks
   // Visual animation states
-  animState?: 'idle' | 'pressed' | 'bursting' | 'revealing' | 'dispensing' | 'popBounced' | 'blocked';
+  animState?: 'idle' | 'pressed' | 'bursting' | 'revealing' | 'dispensing' | 'popBounced' | 'blocked' | 'emptying' | 'cave_dispensing';
   animTimer?: number; // 0 to 1
+  burstSpawned?: boolean;
   scaleX?: number;
   scaleY?: number;
   offsetY?: number;
@@ -32,7 +33,7 @@ export interface Brick {
   color: MarbleColor;
   filled: number; // 0..3
   inFlight: number; // balls currently flying to this brick
-  animState?: 'idle' | 'completing';
+  animState?: 'idle' | 'activate' | 'hit_1' | 'hit_2' | 'hit_3' | 'hold_full' | 'vanish' | 'completing';
   animTimer?: number;
 }
 
@@ -41,6 +42,8 @@ export interface BrickColumn {
   bricks: Brick[];
   lastDropTime: number; // to enforce min 60ms gap between drops
   shiftOffsetY: number; // for smooth slide up overshoot animation
+  enterTimer?: number; // for smooth mechanical elevator entrance animation (0..0.28s)
+  lightPulseTimer?: number; // for neon sci-fi frame lights on/off animation
 }
 
 export interface BeltBall {

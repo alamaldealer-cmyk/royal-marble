@@ -76,15 +76,18 @@ export class ConveyorBeltRenderer {
     ctx: CanvasRenderingContext2D,
     scrollDistance: number,
     currentTime: number,
-    balls: BeltBall[] = []
+    balls: BeltBall[] = [],
+    drawHousing: boolean = false
   ) {
     ctx.save();
 
-    // 1. Housing Base: x: 20..272, y: 490..548 (width 256, height 58, radius 22)
-    this.renderHousing(ctx);
-
-    // 2. Track Capsule: x: 28..268, y: 498..542 (width 240, height 44, radius 22)
-    this.renderTrackCapsule(ctx);
+    // 1. Housing Base: only drawn if standalone without cyber frame
+    if (drawHousing) {
+      this.renderHousing(ctx);
+      this.renderTrackCapsule(ctx, true);
+    } else {
+      this.renderTrackCapsule(ctx, false);
+    }
 
     // 3. Rotating Left & Right Sprockets
     const leftRotAngle = -(scrollDistance / BELT_GEOM.centerRadius);
@@ -147,19 +150,21 @@ export class ConveyorBeltRenderer {
     }
   }
 
-  private renderTrackCapsule(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = THEME.beltTrack;
+  private renderTrackCapsule(ctx: CanvasRenderingContext2D, withRim: boolean = true) {
+    ctx.fillStyle = withRim ? THEME.beltTrack : 'rgba(16, 2, 36, 0.45)';
     ctx.beginPath();
     ctx.roundRect(28, 498, 240, 44, 22);
     ctx.fill();
 
-    ctx.strokeStyle = THEME.beltRim;
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    if (withRim) {
+      ctx.strokeStyle = THEME.beltRim;
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 
   private renderSprocket(

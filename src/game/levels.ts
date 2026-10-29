@@ -36,16 +36,16 @@ export function getLevel35(): LevelData {
 
   // r1: . ? R P ? .
   setCell(1, 1, { kind: 'locked', color: 'lime' });
-  setCell(1, 2, { kind: 'block', color: 'red' });
-  setCell(1, 3, { kind: 'block', color: 'purple' });
+  setCell(1, 2, { kind: 'locked', color: 'red' });
+  setCell(1, 3, { kind: 'locked', color: 'purple' });
   setCell(1, 4, { kind: 'locked', color: 'pink' });
 
   // r2: ? Y C P W ?
   setCell(2, 0, { kind: 'locked', color: 'yellow' });
-  setCell(2, 1, { kind: 'block', color: 'yellow' });
-  setCell(2, 2, { kind: 'block', color: 'cyan' });
-  setCell(2, 3, { kind: 'block', color: 'purple' });
-  setCell(2, 4, { kind: 'block', color: 'ice' });
+  setCell(2, 1, { kind: 'locked', color: 'yellow' });
+  setCell(2, 2, { kind: 'locked', color: 'cyan' });
+  setCell(2, 3, { kind: 'locked', color: 'purple' });
+  setCell(2, 4, { kind: 'locked', color: 'ice' });
   setCell(2, 5, { kind: 'locked', color: 'red' });
 
   // r3: D3 ? P L ? L
@@ -56,25 +56,25 @@ export function getLevel35(): LevelData {
     queue: ['purple', 'ice', 'cyan'],
   });
   setCell(3, 1, { kind: 'locked', color: 'purple' });
-  setCell(3, 2, { kind: 'block', color: 'purple' });
-  setCell(3, 3, { kind: 'block', color: 'lime' });
+  setCell(3, 2, { kind: 'locked', color: 'purple' });
+  setCell(3, 3, { kind: 'locked', color: 'lime' });
   setCell(3, 4, { kind: 'locked', color: 'yellow' });
-  setCell(3, 5, { kind: 'block', color: 'lime' });
+  setCell(3, 5, { kind: 'locked', color: 'lime' });
 
   // r4: P O Y D3 K Y
-  setCell(4, 0, { kind: 'block', color: 'purple' });
-  setCell(4, 1, { kind: 'block', color: 'orange' });
-  setCell(4, 2, { kind: 'block', color: 'yellow' });
+  setCell(4, 0, { kind: 'locked', color: 'purple' });
+  setCell(4, 1, { kind: 'locked', color: 'orange' });
+  setCell(4, 2, { kind: 'locked', color: 'yellow' });
   // Dispenser 2 at (4, 3)
   setCell(4, 3, {
     kind: 'dispenser',
     counter: 3,
     queue: ['pink', 'lime', 'purple'],
   });
-  setCell(4, 4, { kind: 'block', color: 'pink' });
-  setCell(4, 5, { kind: 'block', color: 'yellow' });
+  setCell(4, 4, { kind: 'locked', color: 'pink' });
+  setCell(4, 5, { kind: 'locked', color: 'yellow' });
 
-  // r5: . L W K P .  (exit row)
+  // r5: . L W K P .  (exit row - open and exposed to funnel)
   setCell(5, 1, { kind: 'block', color: 'lime' });
   setCell(5, 2, { kind: 'block', color: 'ice' });
   setCell(5, 3, { kind: 'block', color: 'pink' });
@@ -119,27 +119,27 @@ export function getLevel35(): LevelData {
   // Distributed into 4 columns (24 bricks each).
 
   const columns: MarbleColor[][] = [
-    // col 0 (24 bricks)
+    // col 0: starts with 3 purple buckets to cleanly receive 9-ball purple burst
     [
-      'purple', 'purple', 'lime', 'yellow', 'pink', 'purple', 'cyan', 'lime',
-      'yellow', 'ice', 'purple', 'pink', 'orange', 'lime', 'yellow', 'purple',
-      'red', 'cyan', 'purple', 'pink', 'ice', 'yellow', 'lime', 'purple',
+      'purple', 'purple', 'purple', 'yellow', 'cyan', 'yellow', 'purple', 'orange',
+      'yellow', 'purple', 'red', 'cyan', 'purple', 'yellow', 'lime', 'purple',
+      'purple', 'lime', 'yellow', 'purple', 'cyan', 'purple', 'orange', 'purple',
     ],
-    // col 1 (24 bricks)
+    // col 1: starts with 3 ice buckets to cleanly receive 9-ball ice burst
     [
-      'purple', 'lime', 'yellow', 'purple', 'cyan', 'purple', 'ice', 'orange',
-      'purple', 'lime', 'yellow', 'pink', 'red', 'cyan', 'purple', 'lime',
-      'yellow', 'pink', 'ice', 'purple', 'orange', 'yellow', 'pink', 'lime',
+      'ice', 'ice', 'ice', 'lime', 'yellow', 'pink', 'red', 'cyan',
+      'purple', 'lime', 'yellow', 'pink', 'ice', 'purple', 'orange', 'yellow',
+      'pink', 'lime', 'lime', 'purple', 'cyan', 'yellow', 'pink', 'ice',
     ],
-    // col 2 (24 bricks)
+    // col 2: starts with 3 lime buckets to cleanly receive 9-ball lime burst
     [
-      'lime', 'purple', 'cyan', 'yellow', 'pink', 'ice', 'red', 'purple',
-      'lime', 'yellow', 'orange', 'purple', 'purple', 'cyan', 'lime', 'yellow',
-      'ice', 'pink', 'purple', 'red', 'cyan', 'yellow', 'purple', 'lime',
+      'lime', 'lime', 'lime', 'red', 'purple', 'lime', 'yellow', 'orange',
+      'purple', 'purple', 'cyan', 'lime', 'yellow', 'ice', 'pink', 'purple',
+      'red', 'cyan', 'yellow', 'purple', 'lime', 'pink', 'yellow', 'purple',
     ],
-    // col 3 (24 bricks)
+    // col 3: starts with 3 pink buckets to cleanly receive 9-ball pink burst
     [
-      'pink', 'yellow', 'purple', 'ice', 'lime', 'orange', 'purple', 'cyan',
+      'pink', 'pink', 'pink', 'ice', 'lime', 'orange', 'purple', 'cyan',
       'pink', 'red', 'yellow', 'lime', 'purple', 'ice', 'pink', 'purple',
       'cyan', 'yellow', 'lime', 'orange', 'pink', 'purple', 'red', 'ice',
     ],
@@ -161,9 +161,9 @@ export function getLevel1(): LevelData {
     Array.from({ length: GRID_COLS }, () => ({ kind: 'wall' as const }))
   );
 
-  // A 4-block beginner level
-  grid[4][2] = { kind: 'block', color: 'purple' };
-  grid[4][3] = { kind: 'block', color: 'pink' };
+  // A 4-block beginner level (row 4 covered by tiles, row 5 open)
+  grid[4][2] = { kind: 'locked', color: 'purple' };
+  grid[4][3] = { kind: 'locked', color: 'pink' };
   grid[5][2] = { kind: 'block', color: 'lime' };
   grid[5][3] = { kind: 'block', color: 'yellow' };
 
@@ -226,8 +226,8 @@ export function generateSolvableLevel(levelNum: number): LevelData {
       if (!mask[r][c]) continue;
 
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      // Randomly decide if locked or normal
-      const isLocked = r <= 2 && Math.random() < 0.35;
+      // All blocks above exit row start locked with cover tiles; exit row blocks start exposed
+      const isLocked = r < 5;
       grid[r][c] = {
         kind: isLocked ? 'locked' : 'block',
         color: randomColor,

@@ -124,12 +124,14 @@ export function updateGridAfterChange(grid: GridCell[][]): GridUpdateResult {
         if (belowR < GRID_ROWS && grid[belowR][c].kind === 'empty') {
           const nextColor = cell.queue?.shift() || 'purple';
           cell.counter--;
+          cell.animState = 'cave_dispensing';
+          cell.animTimer = 0;
           grid[belowR][c] = {
             kind: 'block',
             color: nextColor,
             animState: 'dispensing',
             animTimer: 0,
-            offsetY: -33, // slide in from above
+            offsetY: -15, // slide in from above cave slot
           };
           result.dispensedCells.push({
             r: belowR,
