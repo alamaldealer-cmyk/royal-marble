@@ -51,6 +51,7 @@ import { FunnelPhysics } from '../game/physics';
 import {
   isExposed,
   isLevelWon,
+  performShufflePowerup,
   shouldBlockBlockTap,
   tapCell,
   tryMatchBeltBall,
@@ -94,25 +95,27 @@ import railBucketCyan from '../assets/images/rail_buckets/bucket_cyan.png';
 import railBucketOrange from '../assets/images/rail_buckets/bucket_orange.png';
 import railBucketRed from '../assets/images/rail_buckets/bucket_red.png';
 
-// Cover tiles cropped from user spritesheet (image_8bd7b6f3.png)
-import tilePurple from '../assets/images/tiles/tile_purple.png';
-import tilePink from '../assets/images/tiles/tile_pink.png';
-import tileIce from '../assets/images/tiles/tile_ice.png';
-import tileYellow from '../assets/images/tiles/tile_yellow.png';
-import tileLime from '../assets/images/tiles/tile_lime.png';
-import tileCyan from '../assets/images/tiles/tile_cyan.png';
-import tileOrange from '../assets/images/tiles/tile_orange.png';
-import tileRed from '../assets/images/tiles/tile_red.png';
+// Sci-Fi Open Containers (empty containers with 9 sockets inside for the 9 marbles)
+import crateOpenPurple from '../assets/images/crates/crate_open_purple.png';
+import crateOpenPink from '../assets/images/crates/crate_open_pink.png';
+import crateOpenIce from '../assets/images/crates/crate_open_ice.png';
+import crateOpenYellow from '../assets/images/crates/crate_open_yellow.png';
+import crateOpenLime from '../assets/images/crates/crate_open_lime.png';
+import crateOpenCyan from '../assets/images/crates/crate_open_cyan.png';
+import crateOpenOrange from '../assets/images/crates/crate_open_orange.png';
+import crateOpenRed from '../assets/images/crates/crate_open_red.png';
 
-// Open bucket sprites with 9 marbles cropped from top row of user spritesheet
-import bucketOpenPurple from '../assets/images/tiles/bucket_open_purple.png';
-import bucketOpenPink from '../assets/images/tiles/bucket_open_pink.png';
-import bucketOpenIce from '../assets/images/tiles/bucket_open_ice.png';
-import bucketOpenYellow from '../assets/images/tiles/bucket_open_yellow.png';
-import bucketOpenLime from '../assets/images/tiles/bucket_open_lime.png';
-import bucketOpenCyan from '../assets/images/tiles/bucket_open_cyan.png';
-import bucketOpenOrange from '../assets/images/tiles/bucket_open_orange.png';
-import bucketOpenRed from '../assets/images/tiles/bucket_open_red.png';
+// Sci-Fi Closed Crates (closed containers with glowing cyber lids for locked upper blocks)
+import crateClosedPurple from '../assets/images/crates/crate_closed_purple.png';
+import crateClosedPink from '../assets/images/crates/crate_closed_pink.png';
+import crateClosedIce from '../assets/images/crates/crate_closed_ice.png';
+import crateClosedYellow from '../assets/images/crates/crate_closed_yellow.png';
+import crateClosedLime from '../assets/images/crates/crate_closed_lime.png';
+import crateClosedCyan from '../assets/images/crates/crate_closed_cyan.png';
+import crateClosedOrange from '../assets/images/crates/crate_closed_orange.png';
+import crateClosedRed from '../assets/images/crates/crate_closed_red.png';
+import crateMysterySrc from '../assets/images/crates/crate_mystery.png';
+import crateLightBeaconSrc from '../assets/images/crate_light_beacon_spritesheet.png';
 
 // Sci-Fi Slotbar UI Frame (Lights ON & OFF)
 import slotbarLightsOnSrc from '../assets/images/slotbar/slotbar_lights_on.png';
@@ -208,7 +211,7 @@ interface GameBoardProps {
   levelNumber?: number;
 }
 
-export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
+export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 1 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -221,10 +224,37 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
   const [pauseButtonState, setPauseButtonState] = useState<'normal' | 'hover' | 'pressed'>('normal');
   const [soundMuted, setSoundMuted] = useState<boolean>(false);
   const [powerupCounts, setPowerupCounts] = useState({
-    magnet: 1,
-    shuffle: 1,
+    magnet: 3,
+    shuffle: 3,
     gumball: 1,
   });
+  const [isMagnetActive, setIsMagnetActive] = useState<boolean>(false);
+  const isMagnetActiveRef = useRef<boolean>(false);
+  const [isShuffling, setIsShuffling] = useState<boolean>(false);
+
+  // Preload button images for zero-latency, flicker-free rendering
+  useEffect(() => {
+    const urls = [
+      '/assets/buttons/magnet_btn_0.png',
+      '/assets/buttons/magnet_btn_3.png',
+      '/assets/buttons/magnet_lightning_strip.png',
+      '/assets/buttons/shuffle_btn_0.png',
+      '/assets/buttons/shuffle_btn_3.png',
+      '/assets/buttons/shuffle_lightning_strip.png',
+    ];
+    urls.forEach((url) => {
+      const img = new Image();
+      img.src = url;
+    });
+  }, []);
+
+  const setMagnetActive = useCallback((active: boolean | ((prev: boolean) => boolean)) => {
+    setIsMagnetActive((prev) => {
+      const nextVal = typeof active === 'function' ? active(prev) : active;
+      isMagnetActiveRef.current = nextVal;
+      return nextVal;
+    });
+  }, []);
   const [, setImagesLoaded] = useState<boolean>(false);
 
   // Current canvas viewport scale & offset in CSS pixels
@@ -251,7 +281,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
   }, []);
 
   // Game references for requestAnimationFrame loop
-  const levelDataRef = useRef<LevelData>(getLevel35());
+  const levelDataRef = useRef<LevelData>(generateSolvableLevel(levelNumber));
   const gridRef = useRef<GridCell[][]>([]);
   const columnsRef = useRef<BrickColumn[]>([]);
   const physicsRef = useRef<FunnelPhysics>(new FunnelPhysics());
@@ -266,8 +296,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
   const cyberFrameRef = useRef<HTMLImageElement | null>(null);
   const bucketImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
   const railBucketImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
-  const tileImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
-  const bucketOpenImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
+  const crateOpenImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
+  const crateClosedImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
+  const crateMysteryImgRef = useRef<HTMLImageElement | null>(null);
   const slotbarLightsOnRef = useRef<HTMLImageElement | null>(null);
   const slotbarLightsOffRef = useRef<HTMLImageElement | null>(null);
   const bucketsSheetRef = useRef<HTMLImageElement | null>(null);
@@ -277,10 +308,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
   const frameLightsAnimElapsedRef = useRef<number>(0);
   const caveImgsRef = useRef<HTMLImageElement[]>([]);
   const ballImgsRef = useRef<Partial<Record<MarbleColor, HTMLImageElement>>>({});
+  const crateLightBeaconRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     let loadedCount = 0;
-    const totalToLoad = 70;
+    const totalToLoad = 71;
     const checkLoaded = () => {
       loadedCount++;
       if (loadedCount >= totalToLoad) {
@@ -366,47 +398,54 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
     }
     railBucketImgsRef.current = loadedRail;
 
-    // Preload locked cover tiles
-    const colorTileImgMap: Record<MarbleColor, string> = {
-      purple: tilePurple,
-      pink: tilePink,
-      ice: tileIce,
-      yellow: tileYellow,
-      lime: tileLime,
-      cyan: tileCyan,
-      orange: tileOrange,
-      red: tileRed,
+    // Preload closed crates with glowing cyber lids
+    const colorClosedCrateMap: Record<MarbleColor, string> = {
+      purple: crateClosedPurple,
+      pink: crateClosedPink,
+      ice: crateClosedIce,
+      yellow: crateClosedYellow,
+      lime: crateClosedLime,
+      cyan: crateClosedCyan,
+      orange: crateClosedOrange,
+      red: crateClosedRed,
     };
-    const loadedTiles: Partial<Record<MarbleColor, HTMLImageElement>> = {};
-    for (const [c, src] of Object.entries(colorTileImgMap)) {
-      const tImg = new Image();
-      tImg.onload = checkLoaded;
-      tImg.src = src;
-      if (tImg.complete) checkLoaded();
-      loadedTiles[c as MarbleColor] = tImg;
+    const loadedClosedCrates: Partial<Record<MarbleColor, HTMLImageElement>> = {};
+    for (const [c, src] of Object.entries(colorClosedCrateMap)) {
+      const ccImg = new Image();
+      ccImg.onload = checkLoaded;
+      ccImg.src = src;
+      if (ccImg.complete) checkLoaded();
+      loadedClosedCrates[c as MarbleColor] = ccImg;
     }
-    tileImgsRef.current = loadedTiles;
+    crateClosedImgsRef.current = loadedClosedCrates;
 
-    // Preload open bucket images with 9 marbles
-    const colorOpenBucketImgMap: Record<MarbleColor, string> = {
-      purple: bucketOpenPurple,
-      pink: bucketOpenPink,
-      ice: bucketOpenIce,
-      yellow: bucketOpenYellow,
-      lime: bucketOpenLime,
-      cyan: bucketOpenCyan,
-      orange: bucketOpenOrange,
-      red: bucketOpenRed,
+    // Preload mystery question-mark closed crate
+    const mysteryImg = new Image();
+    mysteryImg.onload = checkLoaded;
+    mysteryImg.src = crateMysterySrc;
+    if (mysteryImg.complete) checkLoaded();
+    crateMysteryImgRef.current = mysteryImg;
+
+    // Preload empty open containers (with 9 circular sockets inside)
+    const colorOpenCrateMap: Record<MarbleColor, string> = {
+      purple: crateOpenPurple,
+      pink: crateOpenPink,
+      ice: crateOpenIce,
+      yellow: crateOpenYellow,
+      lime: crateOpenLime,
+      cyan: crateOpenCyan,
+      orange: crateOpenOrange,
+      red: crateOpenRed,
     };
-    const loadedOpenBuckets: Partial<Record<MarbleColor, HTMLImageElement>> = {};
-    for (const [c, src] of Object.entries(colorOpenBucketImgMap)) {
-      const obImg = new Image();
-      obImg.onload = checkLoaded;
-      obImg.src = src;
-      if (obImg.complete) checkLoaded();
-      loadedOpenBuckets[c as MarbleColor] = obImg;
+    const loadedOpenCrates: Partial<Record<MarbleColor, HTMLImageElement>> = {};
+    for (const [c, src] of Object.entries(colorOpenCrateMap)) {
+      const ocImg = new Image();
+      ocImg.onload = checkLoaded;
+      ocImg.src = src;
+      if (ocImg.complete) checkLoaded();
+      loadedOpenCrates[c as MarbleColor] = ocImg;
     }
-    bucketOpenImgsRef.current = loadedOpenBuckets;
+    crateOpenImgsRef.current = loadedOpenCrates;
 
     // Preload animated sci-fi frame light states (8 frames)
     const loadedFrameLights: HTMLImageElement[] = [];
@@ -453,19 +492,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
       loadedBalls[c as MarbleColor] = bImg;
     }
     ballImgsRef.current = loadedBalls;
+
+    // Preload animated 16-frame upward light beacon for locked crates
+    const beaconImg = new Image();
+    beaconImg.onload = checkLoaded;
+    beaconImg.onerror = checkLoaded;
+    beaconImg.src = crateLightBeaconSrc;
+    if (beaconImg.complete) checkLoaded();
+    crateLightBeaconRef.current = beaconImg;
   }, []);
 
   // Initialize level
   const initLevel = useCallback((lvl: number) => {
-    let data: LevelData;
-    if (lvl === 35) {
-      data = getLevel35();
-    } else if (lvl === 1) {
-      data = getLevel1();
-    } else {
-      data = generateSolvableLevel(lvl);
-    }
-
+    const data = generateSolvableLevel(lvl);
     levelDataRef.current = data;
     gridRef.current = data.grid.map((row) =>
       row.map((cell) => ({
@@ -532,82 +571,79 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
   // Next level
   const handleNextLevel = () => {
     sounds.playTap();
-    const nextLvl = currentLevel === 1 ? 35 : currentLevel + 1;
+    const nextLvl = currentLevel + 1;
     setCurrentLevel(nextLvl);
   };
 
-  // Power-up 1: Magnet
-  const useMagnet = () => {
-    if (powerupCounts.magnet <= 0 || gameState !== 'playing') return;
-    setPowerupCounts((p) => ({ ...p, magnet: p.magnet - 1 }));
-    sounds.playPowerup();
-
-    const topColors = new Map<MarbleColor, number>();
-    columnsRef.current.forEach((col, idx) => {
-      if (col.bricks.length > 0) {
-        topColors.set(col.bricks[0].color, idx);
-      }
-    });
-
-    const remainingBeltBalls: BeltBall[] = [];
-
-    for (const ball of beltBallsRef.current) {
-      const colIdx = topColors.get(ball.color);
-      if (colIdx !== undefined) {
-        const col = columnsRef.current[colIdx];
-        const topBrick = col.bricks[0];
-        if (topBrick && topBrick.filled + topBrick.inFlight < BRICK_HOLES) {
-          const targetHole = topBrick.filled + topBrick.inFlight;
-          topBrick.inFlight++;
-          const coords = getBeltCoordinates(ball.s);
-
-          droppingBallsRef.current.push({
-            id: nextDropIdRef.current++,
-            color: ball.color,
-            startX: coords.x,
-            startY: coords.y,
-            targetX: col.x + BRICK_HOLE_OFFSETS[targetHole],
-            targetY: BALTI_SOCKET_Y,
-            progress: 0,
-            duration: 0.22,
-            colIndex: colIdx,
-            holeIndex: targetHole,
-          });
-          continue;
-        }
-      }
-      remainingBeltBalls.push(ball);
+  // Power-up 1: Magnet (Picks and opens balls from any locked crate user taps)
+  const toggleMagnet = () => {
+    if (gameState !== 'playing' || isPaused) return;
+    if (powerupCounts.magnet <= 0) {
+      sounds.playBlocked();
+      return;
     }
-
-    beltBallsRef.current = remainingBeltBalls;
+    sounds.playTap();
+    setMagnetActive((prev) => !prev);
   };
 
-  // Power-up 2: Shuffle
+  // Power-up 2: Shuffle (Brings forward queued buckets that match balls currently on the chain)
   const useShuffle = () => {
-    if (powerupCounts.shuffle <= 0 || gameState !== 'playing') return;
-    setPowerupCounts((p) => ({ ...p, shuffle: p.shuffle - 1 }));
-    sounds.playPowerup();
+    if (gameState !== 'playing' || isPaused) return;
+    if (powerupCounts.shuffle <= 0) {
+      sounds.playBlocked();
+      return;
+    }
 
-    const normalBlocks: { r: number; c: number; color: MarbleColor }[] = [];
-    for (let r = 0; r < GRID_ROWS; r++) {
-      for (let c = 0; c < GRID_COLS; c++) {
-        if (gridRef.current[r][c].kind === 'block' && gridRef.current[r][c].color) {
-          normalBlocks.push({ r, c, color: gridRef.current[r][c].color! });
+    const result = performShufflePowerup(
+      columnsRef.current,
+      beltBallsRef.current,
+      physicsRef.current.balls
+    );
+
+    // Trigger smooth 360-degree spin burst animation on shuffle button
+    setIsShuffling(true);
+    setTimeout(() => setIsShuffling(false), 480);
+
+    if (result.shuffled) {
+      setPowerupCounts((p) => ({ ...p, shuffle: Math.max(0, p.shuffle - 1) }));
+      sounds.playPowerup();
+      sounds.playBallClink();
+
+      // Trigger visual animation and particle sparks on swapped bucket columns
+      result.swappedColumns.forEach((colIdx) => {
+        const col = columnsRef.current[colIdx];
+        if (col && col.bricks.length > 0) {
+          col.shiftOffsetY = 0;
+          col.enterTimer = 0.28;
+          col.lightPulseTimer = 1.0;
+          col.bricks[0].animState = 'activate';
+          col.bricks[0].animTimer = 0;
+
+          const colX = col.x;
+          const colY = 580;
+          for (let s = 0; s < 14; s++) {
+            particlesRef.current.push({
+              x: colX + (Math.random() - 0.5) * 36,
+              y: colY + (Math.random() - 0.5) * 20,
+              vx: (Math.random() - 0.5) * 120,
+              vy: -40 - Math.random() * 60,
+              color: COLOR_CONFIG[col.bricks[0].color]?.hex || '#00F0FF',
+              size: 3 + Math.random() * 4,
+              alpha: 1,
+              life: 0,
+              maxLife: 0.45,
+              shape: s % 2 === 0 ? 'star' : 'sparkle',
+            });
+          }
         }
-      }
-    }
+      });
 
-    const colors = normalBlocks.map((b) => b.color);
-    for (let i = colors.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [colors[i], colors[j]] = [colors[j], colors[i]];
+      // Frame lights pulse
+      frameLightsAnimTimerRef.current = 1.5;
+      frameLightsAnimElapsedRef.current = 0;
+    } else {
+      sounds.playBlocked();
     }
-
-    normalBlocks.forEach((b, idx) => {
-      gridRef.current[b.r][b.c].color = colors[idx];
-      gridRef.current[b.r][b.c].animState = 'popBounced';
-      gridRef.current[b.r][b.c].animTimer = 0;
-    });
   };
 
   // Power-up 3: Gumball
@@ -669,6 +705,72 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
           arenaGameY <= cy + halfH
         ) {
           const cell = gridRef.current[r][c];
+
+          // 1. MAGNET POWER-UP ACTIVE: Tapping any locked (or unexposed) tile opens it and bursts its balls!
+          if (isMagnetActiveRef.current) {
+            if (cell.kind === 'locked' || cell.kind === 'block') {
+              // Consume 1 Magnet
+              setPowerupCounts((p) => ({ ...p, magnet: Math.max(0, p.magnet - 1) }));
+              setMagnetActive(false);
+              sounds.playPowerup();
+
+              // Lights burst effect on the cyber frame
+              frameLightsAnimTimerRef.current = 2.0;
+              frameLightsAnimElapsedRef.current = 0;
+
+              // Electric magnetic particles arcing on the tapped crate
+              for (let s = 0; s < 22; s++) {
+                particlesRef.current.push({
+                  x: cx + (Math.random() - 0.5) * 26,
+                  y: cy + ARENA_SHIFT_Y + (Math.random() - 0.5) * 20,
+                  vx: (Math.random() - 0.5) * 140,
+                  vy: -60 - Math.random() * 80,
+                  color: s % 2 === 0 ? '#00F0FF' : '#FFE853',
+                  size: 3 + Math.random() * 4,
+                  alpha: 1,
+                  life: 0,
+                  maxLife: 0.5,
+                  shape: 'sparkle',
+                });
+              }
+
+              const burstColor = cell.color || 'purple';
+              // Empty the cell and burst open its 9 balls into the funnel!
+              gridRef.current[r][c] = { kind: 'empty' };
+              sounds.playPopBurst();
+              physicsRef.current.spawnBurst(cx, cy, burstColor, BALLS_PER_BLOCK);
+              setScore((s) => s + 100);
+
+              // Update grid to reveal newly adjacent locked tiles
+              const changes = updateGridAfterChange(gridRef.current);
+              if (changes.revealedCells.length > 0) {
+                sounds.playTap();
+                changes.revealedCells.forEach(({ r: revR, c: revC, color: revColor }) => {
+                  const rx = GRID_X_CENTERS[revC];
+                  const ry = GRID_Y_CENTERS[revR] + ARENA_SHIFT_Y;
+                  for (let s = 0; s < 5; s++) {
+                    particlesRef.current.push({
+                      x: rx + (Math.random() - 0.5) * 20,
+                      y: ry + (Math.random() - 0.5) * 16,
+                      vx: (Math.random() - 0.5) * 80,
+                      vy: -25 - Math.random() * 45,
+                      color: COLOR_CONFIG[revColor]?.hex || '#FFE494',
+                      size: 3 + Math.random() * 3,
+                      alpha: 1,
+                      life: 0,
+                      maxLife: 0.35,
+                      shape: 'sparkle',
+                    });
+                  }
+                });
+              }
+              if (changes.dispensedCells.length > 0) {
+                sounds.playPopBurst();
+              }
+              return;
+            }
+          }
+
           if (cell.kind === 'block' && isExposed(gridRef.current, r, c) && cell.animState !== 'revealing') {
             // Trigger lights blink & chase animation on upper bucket click!
             frameLightsAnimTimerRef.current = 1.6;
@@ -817,7 +919,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
         return;
       }
 
-      const dpr = window.devicePixelRatio || 1;
+      // Support high-DPI Retina screens on mobile (DPR 2x to 3x)
+      const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3);
       const displayW = Math.round(rect.width * dpr);
       const displayH = Math.round(rect.height * dpr);
 
@@ -825,6 +928,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
         canvas.width = displayW;
         canvas.height = displayH;
       }
+
+      // Explicitly set high-definition smoothing to prevent pixelation on mobile screens
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       ctx.save();
       // Apply DPR scaling
@@ -834,8 +941,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
       const scaleX = rect.width / BASE_WIDTH;
       const scaleY = rect.height / BASE_HEIGHT;
       const scale = Math.min(scaleX, scaleY);
-      const offsetX = (rect.width - BASE_WIDTH * scale) / 2;
-      const offsetY = (rect.height - BASE_HEIGHT * scale) / 2;
+      const offsetX = Math.round((rect.width - BASE_WIDTH * scale) / 2);
+      const offsetY = Math.round((rect.height - BASE_HEIGHT * scale) / 2);
+      const arenaOffsetY = Math.round(offsetY + ARENA_SHIFT_Y * scale);
 
       viewTransformRef.current = { scale, offsetX, offsetY };
 
@@ -847,7 +955,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
         ctx.fillRect(0, 0, rect.width, rect.height);
       }
 
-      ctx.translate(offsetX, offsetY + ARENA_SHIFT_Y * scale);
+      ctx.translate(offsetX, arenaOffsetY);
       ctx.scale(scale, scale);
 
       // ==========================================
@@ -1091,13 +1199,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
         frameLightsAnimElapsedRef.current += dt;
       }
 
+
       // ==========================================
       // 2. CANVAS RENDERING
       // ==========================================
       // Renders the cyber frame with animated lights: upper buckets chamber, funnel neck & bottom chain dock
       renderCyberFrame(ctx);
       // Conveyor belt renders the rotating sprockets, moving link treads, and 30 sockets with marbles
-      conveyorRenderer.render(ctx, beltScrollDistanceRef.current, currentTime, beltBallsRef.current, false);
+      conveyorRenderer.render(ctx, beltScrollDistanceRef.current, currentTime, beltBallsRef.current, false, ballImgsRef.current);
       renderMachineRailingAndBaltis(ctx, columnsRef.current, dt);
       renderGridBlocks(ctx, gridRef.current, dt);
       renderFunnelBalls(ctx, physicsRef.current.balls);
@@ -1488,8 +1597,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
 
         const tappable = cell.kind === 'block' && isExposed(grid, r, c) && cell.animState !== 'revealing';
 
+        const isLockedTarget = isMagnetActiveRef.current && (cell.kind === 'locked' || (cell.kind === 'block' && !isExposed(grid, r, c)));
+        const levitateY = isLockedTarget ? Math.sin(performance.now() * 0.005 + r * 1.5 + c * 1.0) * 2.5 : 0;
+
         ctx.save();
-        ctx.translate(cx, cy);
+        ctx.translate(cx, cy + levitateY);
+
+        // When Magnet targeting is active: beam upward light column & floor pedestal from beneath each locked crate!
+        if (isLockedTarget) {
+          const beaconImg = crateLightBeaconRef.current;
+          if (beaconImg && beaconImg.complete && beaconImg.naturalWidth > 0) {
+            const frameIdx = Math.floor((performance.now() / 65 + r * 3 + c * 2) % 16);
+            const sx = frameIdx * 100;
+            const sy = 0;
+            const sw = 100;
+            const sh = 120;
+            const beaconW = 50;
+            const beaconH = 62;
+            // Emitter floor is at y = 96 in 120h frame (80% down).
+            // Align emitter floor directly under crate bottom (y = 16), so beacon top is at 16 - 0.8 * 62 = -33.6
+            ctx.drawImage(beaconImg, sx, sy, sw, sh, -beaconW / 2, -34, beaconW, beaconH);
+          }
+
+          // Soft radiant upward underglow illuminating the crate's bottom edge
+          ctx.save();
+          const underglowGrad = ctx.createRadialGradient(0, 15, 1, 0, 13, 17);
+          underglowGrad.addColorStop(0, 'rgba(255, 235, 100, 0.75)');
+          underglowGrad.addColorStop(0.45, 'rgba(0, 240, 255, 0.55)');
+          underglowGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+          ctx.fillStyle = underglowGrad;
+          ctx.beginPath();
+          ctx.ellipse(0, 15, 18, 6.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
 
         if (cell.animState === 'pressed') {
           ctx.scale(1.1, 0.85);
@@ -1507,31 +1648,86 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
 
         if (cell.kind === 'locked') {
           const drawW = 35;
-          const drawH = 33;
-          const color = cell.color || 'purple';
-          const tileImg = tileImgsRef.current[color];
+          const drawH = 32;
+          const isMystery = Boolean(cell.isMystery);
+          // When isMystery is true, conceal the color using the mystery titanium crate!
+          const crateImg = isMystery
+            ? (crateMysteryImgRef.current || crateClosedImgsRef.current['purple'])
+            : crateClosedImgsRef.current[cell.color || 'purple'];
 
-          // Dark slot cavity behind tile
-          ctx.fillStyle = '#1D0A35';
+          // Dark slot cavity behind crate
+          ctx.fillStyle = '#100520';
           ctx.beginPath();
-          ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 7);
+          ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 6);
           ctx.fill();
 
-          if (tileImg && tileImg.complete && tileImg.naturalWidth > 0) {
-            // Draw clean cropped cover tile on top of the locked bucket
-            const tileW = 36;
-            const tileH = 30;
-            ctx.drawImage(tileImg, -tileW / 2, -tileH / 2, tileW, tileH);
+          if (crateImg && crateImg.complete && crateImg.naturalWidth > 0) {
+            ctx.drawImage(crateImg, -drawW / 2, -drawH / 2, drawW, drawH);
           } else {
             // Elegant fallback if image still loading
-            const config = COLOR_CONFIG[color];
-            ctx.fillStyle = config.hex;
+            ctx.fillStyle = '#1F1138';
             ctx.beginPath();
             ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 7);
             ctx.fill();
-            ctx.strokeStyle = config.border;
+            ctx.strokeStyle = '#00F0FF';
             ctx.lineWidth = 1.5;
             ctx.stroke();
+          }
+
+          // If mystery crate: render the high-tech glowing Question Mark (?) badge!
+          if (isMystery) {
+            const now = performance.now();
+            // Subtle rhythmic energy pulse
+            const pulse = 1.0 + 0.05 * Math.sin(now * 0.005 + r * 1.8 + c * 1.2);
+            const badgeY = -1;
+
+            ctx.save();
+            ctx.translate(0, badgeY);
+            ctx.scale(pulse, pulse);
+
+            // Outer cyan energy glow
+            ctx.shadowColor = '#00E5FF';
+            ctx.shadowBlur = 9;
+
+            // Cyber badge backing plate (hexagonal / rounded tech badge)
+            ctx.fillStyle = 'rgba(12, 6, 28, 0.92)';
+            ctx.beginPath();
+            ctx.roundRect(-9, -9, 18, 18, 5);
+            ctx.fill();
+
+            // Neon cyan border
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.95)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Inner cyber tech corners
+            ctx.strokeStyle = 'rgba(255, 230, 80, 0.85)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(-6, -7);
+            ctx.lineTo(-7, -7);
+            ctx.lineTo(-7, -6);
+            ctx.moveTo(6, -7);
+            ctx.lineTo(7, -7);
+            ctx.lineTo(7, -6);
+            ctx.moveTo(-6, 7);
+            ctx.lineTo(-7, 7);
+            ctx.lineTo(-7, 6);
+            ctx.moveTo(6, 7);
+            ctx.lineTo(7, 7);
+            ctx.lineTo(7, 6);
+            ctx.stroke();
+
+            // Bright glowing Question Mark (?)
+            ctx.shadowColor = '#FFE853';
+            ctx.shadowBlur = 7;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '900 13px Fredoka, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', 0, 0.5);
+
+            ctx.restore();
           }
         } else if (cell.kind === 'dispenser') {
           if (cell.animState === 'cave_dispensing') {
@@ -1629,30 +1825,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
           const drawW = 35;
           const drawH = 33;
 
-          if (cell.animState === 'emptying' && bucketsSheetRef.current && bucketsSheetRef.current.complete) {
+          if (cell.animState === 'emptying') {
             cell.animTimer = (cell.animTimer || 0) + dt;
             const progress = Math.min(1.0, cell.animTimer / 0.26);
-            const frameIdx = Math.min(10, Math.floor(progress * 11));
-            const rowIndex = COLOR_ROW_MAP[cell.color] ?? 0;
-            const colCenterX = BUCKET_COL_CENTERS[frameIdx];
-
-            // Source crop from clean sprite sheet
-            const sx = Math.max(0, colCenterX - 64);
-            const sy = rowIndex * 128;
-            const sw = 128;
-            const sh = 128;
-
-            ctx.drawImage(
-              bucketsSheetRef.current,
-              sx,
-              sy,
-              sw,
-              sh,
-              -drawW / 2,
-              -drawH / 2,
-              drawW,
-              drawH
-            );
 
             // Pop marbles into funnel when halfway through emptying (around frame 4-5)
             if (cell.animTimer >= 0.12 && !cell.burstSpawned) {
@@ -1661,6 +1836,38 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
               physicsRef.current.spawnBurst(cx, cy, cell.color, BALLS_PER_BLOCK);
               setScore((s) => s + 50);
             }
+
+            // Draw open crate shrinking with bright flash
+            const openImg = crateOpenImgsRef.current[cell.color];
+            const shrink = 1.0 - progress * 0.18;
+            ctx.save();
+            ctx.scale(shrink, shrink);
+
+            if (openImg && openImg.complete && openImg.naturalWidth > 0) {
+              ctx.drawImage(openImg, -drawW / 2, -drawH / 2, drawW, drawH);
+
+              // Progressively pop the balls into the funnel as animation plays
+              const colOffsets = [-7.1, 0, 7.1];
+              const rowOffsets = [-7.2, -0.6, 6.0];
+              const ballR = 3.2;
+              const ballsLeft = Math.max(0, Math.floor((1 - progress) * 9));
+              let count = 0;
+              for (let rIdx = 0; rIdx < 3; rIdx++) {
+                for (let cIdx = 0; cIdx < 3; cIdx++) {
+                  if (count < ballsLeft) {
+                    drawGlossyBall(ctx, colOffsets[cIdx], rowOffsets[rIdx], ballR, cell.color);
+                  }
+                  count++;
+                }
+              }
+            } else {
+              // Fallback
+              ctx.fillStyle = config.hex;
+              ctx.beginPath();
+              ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 7);
+              ctx.fill();
+            }
+            ctx.restore();
 
             // Once animation completes, clear the cell and update grid
             if (cell.animTimer >= 0.26) {
@@ -1692,90 +1899,116 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
               }
             }
           } else if (cell.animState === 'revealing') {
-            // Unlocking animation: tile lifts off and fades away, exposing open bucket underneath
+            // Unlocking animation: closed crate lid lifts off and fades away, exposing open container underneath
             cell.animTimer = (cell.animTimer || 0) + dt;
             const p = Math.min(1.0, cell.animTimer / 0.35);
 
-            // 1. Draw open bucket underneath
-            const openImg = bucketOpenImgsRef.current[cell.color] || bucketImgsRef.current[cell.color];
+            // 1. Draw open container underneath with its 9 color-matched balls in sockets
+            const openImg = crateOpenImgsRef.current[cell.color];
             if (openImg && openImg.complete && openImg.naturalWidth > 0) {
-              ctx.fillStyle = config.dark;
-              ctx.beginPath();
-              ctx.roundRect(-drawW / 2 + 2, -drawH / 2 + 2, drawW - 4, drawH - 4, 6);
-              ctx.fill();
               ctx.drawImage(openImg, -drawW / 2, -drawH / 2, drawW, drawH);
+
+              // 9 color-matched glossy balls in the sockets
+              const colOffsets = [-7.1, 0, 7.1];
+              const rowOffsets = [-7.2, -0.6, 6.0];
+              const ballR = 3.2;
+              for (let rIdx = 0; rIdx < 3; rIdx++) {
+                for (let cIdx = 0; cIdx < 3; cIdx++) {
+                  drawGlossyBall(ctx, colOffsets[cIdx], rowOffsets[rIdx], ballR, cell.color);
+                }
+              }
             } else {
-              ctx.fillStyle = config.hex;
+              const cfg = COLOR_CONFIG[cell.color];
+              ctx.fillStyle = cfg.hex;
               ctx.beginPath();
               ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 7);
               ctx.fill();
-              ctx.strokeStyle = config.border;
-              ctx.lineWidth = 1.5;
-              ctx.stroke();
-
-              for (let mr = 0; mr < 3; mr++) {
-                for (let mc = 0; mc < 3; mc++) {
-                  const mx = -drawW / 2 + 7 + mc * 10;
-                  const my = -drawH / 2 + 7 + mr * 9;
-                  drawGlossyBall(ctx, mx, my, 3.5, cell.color);
-                }
-              }
             }
 
-            // 2. Animate cover tile lifting and popping away!
-            const tileImg = tileImgsRef.current[cell.color];
-            if (tileImg && tileImg.complete && tileImg.naturalWidth > 0) {
+            // 2. Animate closed crate lid lifting and popping away!
+            const isMystery = Boolean(cell.isMystery);
+            const closedImg = isMystery
+              ? (crateMysteryImgRef.current || crateClosedImgsRef.current['purple'])
+              : crateClosedImgsRef.current[cell.color];
+
+            if (closedImg && closedImg.complete && closedImg.naturalWidth > 0) {
               ctx.save();
-              const liftY = -p * 24; // lifts up 24px
-              const popScale = 1.0 + 0.16 * Math.sin(p * Math.PI); // pop scale
+              const liftY = -p * 26; // lifts up 26px
+              const popScale = 1.0 + 0.18 * Math.sin(p * Math.PI); // pop scale
               const alpha = Math.max(0, 1.0 - p * 1.2); // fade out
-              const rot = (c % 2 === 0 ? 0.1 : -0.1) * p; // subtle rotation flip
+              const rot = (c % 2 === 0 ? 0.08 : -0.08) * p; // subtle rotation flip
 
               ctx.translate(0, liftY);
               ctx.rotate(rot);
               ctx.scale(popScale, popScale);
               ctx.globalAlpha = alpha;
 
-              const tileW = 36;
-              const tileH = 30;
-              ctx.drawImage(tileImg, -tileW / 2, -tileH / 2, tileW, tileH);
+              ctx.drawImage(closedImg, -drawW / 2, -drawH / 2, drawW, 32);
+
+              // If it was a mystery crate, question mark badge is on the lid as it lifts and flies off!
+              if (isMystery) {
+                ctx.shadowColor = '#00E5FF';
+                ctx.shadowBlur = 9;
+                ctx.fillStyle = 'rgba(12, 6, 28, 0.92)';
+                ctx.beginPath();
+                ctx.roundRect(-9, -10, 18, 18, 5);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(0, 240, 255, 0.95)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.shadowColor = '#FFE853';
+                ctx.shadowBlur = 7;
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '900 13px Fredoka, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('?', 0, -0.5);
+              }
+
               ctx.restore();
             }
 
-            // End of reveal animation: bucket becomes active
+            // End of reveal animation: container becomes active
             if (cell.animTimer >= 0.35) {
               cell.animState = 'idle';
               cell.animTimer = undefined;
+              cell.isMystery = false;
             }
           } else {
-            // Idle / active / popBounced state: render glossy open bucket container
-            const openImg = bucketOpenImgsRef.current[cell.color] || bucketImgsRef.current[cell.color];
+            // Idle / active / popBounced state: render open sci-fi container with 9 color-matched balls in sockets
+            const openImg = crateOpenImgsRef.current[cell.color];
             if (openImg && openImg.complete && openImg.naturalWidth > 0) {
-              // Solid container backing cavity so no background color ever shines through
-              ctx.fillStyle = config.dark;
-              ctx.beginPath();
-              ctx.roundRect(-drawW / 2 + 2, -drawH / 2 + 2, drawW - 4, drawH - 4, 6);
-              ctx.fill();
-
-              // Full-color vibrant open bucket image with 9 marbles
+              // Draw empty container
               ctx.drawImage(openImg, -drawW / 2, -drawH / 2, drawW, drawH);
 
+              // Draw the 9 balls inside the container's 9 circular sockets!
+              const colOffsets = [-7.1, 0, 7.1];
+              const rowOffsets = [-7.2, -0.6, 6.0];
+              const ballR = 3.2;
+              for (let rIdx = 0; rIdx < 3; rIdx++) {
+                for (let cIdx = 0; cIdx < 3; cIdx++) {
+                  drawGlossyBall(ctx, colOffsets[cIdx], rowOffsets[rIdx], ballR, cell.color);
+                }
+              }
+
               if (tappable) {
-                // Subtle bright golden outline for exposed active bucket
+                // Subtle bright golden outline for exposed active container
                 ctx.strokeStyle = '#FFE382';
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.roundRect(-drawW / 2 + 1, -drawH / 2 + 1, drawW - 2, drawH - 2, 7);
                 ctx.stroke();
 
-                // Sparkle dot on exposed active bucket
+                // Sparkle dot on exposed active container
                 ctx.fillStyle = '#FFE382';
                 ctx.beginPath();
                 ctx.arc(drawW / 2 - 4, -drawH / 2 + 5, 2, 0, Math.PI * 2);
                 ctx.fill();
               }
             } else {
-              // High-fidelity fallback bucket with 9 glossy marbles
+              // High-fidelity fallback container with 9 glossy marbles
               ctx.fillStyle = config.hex;
               ctx.beginPath();
               ctx.roundRect(-drawW / 2, -drawH / 2, drawW, drawH, 7);
@@ -1795,7 +2028,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
                 for (let mc = 0; mc < 3; mc++) {
                   const mx = -drawW / 2 + 7 + mc * 10;
                   const my = -drawH / 2 + 7 + mr * 9;
-                  drawGlossyBall(ctx, mx, my, 3.5, cell.color);
+                  drawGlossyBall(ctx, mx, my, 3.2, cell.color);
                 }
               }
             }
@@ -1823,7 +2056,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
 
     const ballImg = ballImgsRef.current[color];
     if (ballImg && ballImg.complete && ballImg.naturalWidth > 0) {
-      const size = radius * 2.05;
+      // 128x128 image has sphere of radius 53px (106px diameter). 128 / 53 = 2.415
+      const size = radius * 2.42;
       ctx.drawImage(ballImg, -size / 2, -size / 2, size, size);
     } else {
       const config = COLOR_CONFIG[color];
@@ -1938,7 +2172,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
         onPointerMove={handlePointerMove}
         onPointerLeave={() => setPauseButtonState('normal')}
         data-testid="marble-sort-canvas"
-        className="w-full h-full touch-none cursor-pointer block"
+        style={{
+          width: '100%',
+          height: '100%',
+          imageRendering: 'auto',
+        }}
+        className="touch-none cursor-pointer block"
       />
 
       {/* Interactive HUD Layer (Accessible, stylable in AI Studio edit panel, with dedicated element IDs) */}
@@ -2037,11 +2276,155 @@ export const GameBoard: React.FC<GameBoardProps> = ({ levelNumber = 35 }) => {
           </span>
         </div>
 
-        {/* Hidden Accessible Controls for Power-ups */}
-        <div className="opacity-0 pointer-events-none">
-          <button onClick={useMagnet} className="pointer-events-auto" aria-label="Use Magnet Power-up">Magnet</button>
-          <button onClick={useShuffle} className="pointer-events-auto" aria-label="Use Shuffle Power-up">Shuffle</button>
-          <button onClick={useGumball} className="pointer-events-auto" aria-label="Use Gumball Power-up">Gumball</button>
+        {/* 3. Level Indicator Pill: Center-top between Pause and Coins */}
+        <div
+          id="level-badge-ui"
+          aria-label={`Level ${currentLevel}`}
+          className="absolute pointer-events-none select-none flex items-center justify-center shadow-lg"
+          style={{
+            top: '8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            height: '26px',
+            padding: '0 14px',
+            borderRadius: '9999px',
+            background: 'linear-gradient(180deg, #461484 0%, #1E073D 100%)',
+            border: '1.5px solid #F5D061',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.7), inset 0 1px 2px rgba(255,255,255,0.25)',
+          }}
+        >
+          <span
+            className="font-extrabold text-[#FFE382] text-[11px] tracking-widest uppercase"
+            style={{
+              textShadow: '0 1px 2px rgba(0,0,0,0.9), 0 0 5px rgba(245,208,97,0.7)',
+              fontFamily: "'Fredoka', sans-serif",
+            }}
+          >
+            Level {currentLevel}
+          </span>
+        </div>
+
+        {/* Power-up Bar: Magnet (🧲) & Shuffle (🔀) (Centered below Level Indicator, matching image_11aa8b60.png) */}
+        <div
+          className="absolute flex flex-col items-center select-none"
+          style={{
+            top: '40px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 35,
+          }}
+        >
+          <div className="flex items-center justify-center gap-3.5 select-none">
+            {/* 1. Magnet Power-up Button with Rapid Lightning Spritesheet Animation */}
+            <button
+              id="magnet-powerup-btn"
+              type="button"
+              onClick={toggleMagnet}
+              aria-label={`Magnet Power-up (${powerupCounts.magnet} available)`}
+              className={`pointer-events-auto relative flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 ${
+                isMagnetActive
+                  ? 'scale-105'
+                  : 'hover:scale-105 hover:brightness-110 filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.85)]'
+              }`}
+              style={{
+                width: '52px',
+                height: '52px',
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+              }}
+            >
+              {/* Button Graphic with 6-Frame Lightning Arc Cycle */}
+              <div
+                className={`w-full h-full select-none pointer-events-none ${
+                  isMagnetActive ? 'animate-magnet-lightning' : ''
+                }`}
+                style={{
+                  backgroundImage: isMagnetActive
+                    ? undefined
+                    : 'url(/assets/buttons/magnet_btn_0.png)',
+                  backgroundSize: isMagnetActive ? undefined : 'contain',
+                  backgroundPosition: isMagnetActive ? undefined : 'center',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+
+              {/* High-End Gaming Badge Count */}
+              <div
+                className="absolute flex items-center justify-center font-extrabold text-white text-[11px] select-none pointer-events-none shadow-md"
+                style={{
+                  bottom: '-2px',
+                  right: '-2px',
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '9999px',
+                  background: isMagnetActive
+                    ? 'linear-gradient(180deg, #00F0FF 0%, #0077FF 100%)'
+                    : 'linear-gradient(180deg, #FF3D68 0%, #BA0028 100%)',
+                  border: '1.5px solid #FFFFFF',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                  fontFamily: "'Fredoka', sans-serif",
+                  lineHeight: 1,
+                }}
+              >
+                {powerupCounts.magnet}
+              </div>
+            </button>
+
+            {/* 2. Shuffle Power-up Button with Rapid Lightning Swirl & Spin on Click */}
+            <button
+              id="shuffle-powerup-btn"
+              type="button"
+              onClick={useShuffle}
+              aria-label={`Shuffle Power-up (${powerupCounts.shuffle} available)`}
+              className={`pointer-events-auto relative flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-95 ${
+                isShuffling
+                  ? 'scale-105'
+                  : 'hover:scale-105 hover:brightness-110 filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.85)]'
+              }`}
+              style={{
+                width: '52px',
+                height: '52px',
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+              }}
+            >
+              {/* Button Graphic with 6-Frame Lightning Swirl on Click */}
+              <div
+                className={`w-full h-full select-none pointer-events-none ${
+                  isShuffling ? 'animate-shuffle-burst' : ''
+                }`}
+                style={{
+                  backgroundImage: isShuffling
+                    ? undefined
+                    : 'url(/assets/buttons/shuffle_btn_0.png)',
+                  backgroundSize: isShuffling ? undefined : 'contain',
+                  backgroundPosition: isShuffling ? undefined : 'center',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              />
+
+              {/* Matching High-End Gaming Badge Count */}
+              <div
+                className="absolute flex items-center justify-center font-extrabold text-white text-[11px] select-none pointer-events-none shadow-md"
+                style={{
+                  bottom: '-2px',
+                  right: '-2px',
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '9999px',
+                  background: 'linear-gradient(180deg, #FF3D68 0%, #BA0028 100%)',
+                  border: '1.5px solid #FFFFFF',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                  fontFamily: "'Fredoka', sans-serif",
+                  lineHeight: 1,
+                }}
+              >
+                {powerupCounts.shuffle}
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 

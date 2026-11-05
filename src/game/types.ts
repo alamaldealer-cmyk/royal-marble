@@ -18,6 +18,7 @@ export type CellKind = 'empty' | 'block' | 'locked' | 'dispenser' | 'wall';
 export interface GridCell {
   kind: CellKind;
   color?: MarbleColor; // for block, or hidden color for locked
+  isMystery?: boolean; // mystery locked crate with question mark
   counter?: number; // for dispenser (e.g. 3)
   queue?: MarbleColor[]; // dispenser's upcoming blocks
   // Visual animation states

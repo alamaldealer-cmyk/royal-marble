@@ -16,7 +16,7 @@ export default function App() {
         if (!isNaN(num) && num > 0) return num;
       }
     }
-    return 35;
+    return 1;
   }, []);
 
   return (

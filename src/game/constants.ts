@@ -22,7 +22,7 @@ export const MAX_WAITING_BALLS = 45; // Max balls in funnel before locking taps
 export const RESUME_WAITING_BALLS = 40; // Funnel count must drop below 40 to resume taps
 
 export const BALL_RADIUS_FUNNEL = 7;
-export const BALL_RADIUS_BELT = 6;
+export const BALL_RADIUS_BELT = 7;
 export const MIN_DROP_INTERVAL_MS = 60; // Har column ke liye min 60ms gap
 
 // ==========================================

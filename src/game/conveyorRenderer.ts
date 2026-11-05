@@ -77,7 +77,8 @@ export class ConveyorBeltRenderer {
     scrollDistance: number,
     currentTime: number,
     balls: BeltBall[] = [],
-    drawHousing: boolean = false
+    drawHousing: boolean = false,
+    ballImages?: Record<string, HTMLImageElement>
   ) {
     ctx.save();
 
@@ -102,7 +103,7 @@ export class ConveyorBeltRenderer {
     this.renderDividerRail(ctx);
 
     // 6. Moving Ball Sockets & Locked Nested Marbles (100% exact alignment)
-    this.renderMovingBallSockets(ctx, scrollDistance, balls);
+    this.renderMovingBallSockets(ctx, scrollDistance, balls, ballImages);
 
     // 7. Subtle Flow Chevrons (<< on top lane, >> on bottom lane)
     this.renderFlowChevrons(ctx, scrollDistance);
@@ -295,7 +296,8 @@ export class ConveyorBeltRenderer {
   private renderMovingBallSockets(
     ctx: CanvasRenderingContext2D,
     scrollDistance: number,
-    balls: BeltBall[]
+    balls: BeltBall[],
+    ballImages?: Record<string, HTMLImageElement>
   ) {
     ctx.save();
 
@@ -349,7 +351,16 @@ export class ConveyorBeltRenderer {
       // (B) IF A BALL IS IN THIS SLOT, DRAW IT AT THE EXACT SAME (0, 0) CENTER!
       const ball = ballBySlot.get(i);
       if (ball) {
-        this.drawGlossyMarble(ctx, 0, 0, BALL_RADIUS_BELT, ball.color, ball.scale);
+        const sprite = ballImages ? ballImages[ball.color] : null;
+        if (sprite && sprite.complete && sprite.naturalWidth > 0) {
+          ctx.save();
+          if (ball.scale !== 1.0) ctx.scale(ball.scale, ball.scale);
+          const size = BALL_RADIUS_BELT * 2.42;
+          ctx.drawImage(sprite, -size / 2, -size / 2, size, size);
+          ctx.restore();
+        } else {
+          this.drawGlossyMarble(ctx, 0, 0, BALL_RADIUS_BELT, ball.color, ball.scale);
+        }
       }
 
       ctx.restore();

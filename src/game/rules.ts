@@ -301,3 +301,56 @@ export function isLevelStalled(
   const hasMatchableBall = beltBalls.some((b) => topColors.has(b.color));
   return !hasMatchableBall;
 }
+
+/**
+ * Shuffle Power-Up logic:
+ * Brings forward queued buckets in columns that match marbles currently on the conveyor belt or in physics,
+ * or rotates queued buckets to unlock progress and prevent stall.
+ */
+export function performShufflePowerup(
+  columns: BrickColumn[],
+  beltBalls: { color: MarbleColor }[],
+  physicsBalls: { color: MarbleColor }[]
+): { shuffled: boolean; swappedColumns: number[] } {
+  const activeColors = new Set<MarbleColor>([
+    ...beltBalls.map((b) => b.color),
+    ...physicsBalls.map((b) => b.color),
+  ]);
+
+  const swappedColumns: number[] = [];
+  let didSwap = false;
+
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
+    if (col.bricks.length > 1) {
+      const topColor = col.bricks[0].color;
+      if (!activeColors.has(topColor)) {
+        const matchingIdx = col.bricks.findIndex((b, idx) => idx > 0 && activeColors.has(b.color));
+        if (matchingIdx > 0) {
+          const [promoted] = col.bricks.splice(matchingIdx, 1);
+          col.bricks.unshift(promoted);
+          swappedColumns.push(i);
+          didSwap = true;
+        }
+      }
+    }
+  }
+
+  if (!didSwap) {
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      if (col.bricks.length > 1) {
+        const temp = col.bricks[0];
+        col.bricks[0] = col.bricks[1];
+        col.bricks[1] = temp;
+        swappedColumns.push(i);
+        didSwap = true;
+      }
+    }
+  }
+
+  return {
+    shuffled: didSwap || columns.some((c) => c.bricks.length > 0),
+    swappedColumns: swappedColumns.length > 0 ? swappedColumns : [0, 1, 2, 3].slice(0, columns.length),
+  };
+}
